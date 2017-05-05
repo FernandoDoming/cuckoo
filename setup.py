@@ -185,6 +185,7 @@ do_setup(
         "python-magic==0.4.12",
         "sflock>=0.2.8, <0.3",
         "sqlalchemy==1.0.8",
+        "unicorn==1.0.0",
         "wakeonlan==0.2.2",
     ] + install_requires,
     extras_require={
