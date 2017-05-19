@@ -15,6 +15,7 @@ import peutils
 import re
 import struct
 import zipfile
+from lxml import etree
 
 try:
     import M2Crypto
@@ -493,6 +494,10 @@ class OfficeDocument(object):
 
     def unpack_docx(self):
         """Unpacks .docx-based zip files."""
+        if self.files:
+            # Already unpacked
+            return
+
         try:
             z = zipfile.ZipFile(self.filepath)
             for name in z.namelist():
@@ -508,12 +513,26 @@ class OfficeDocument(object):
                 ret.extend(re.findall(self.eps_comments, content))
         return ret
 
+    def extract_text(self):
+        try:
+            self.unpack_docx()
+            for name, data in self.files.iteritems():
+                if name.endswith("document.xml"):
+                    tree = etree.fromstring(data)
+                    text = etree.tostring(tree, encoding='utf8', method='text')
+                    return text.decode('utf8')
+            return None
+        except Exception as e:
+            print e
+            return None
+
     def run(self):
         self.unpack_docx()
 
         return {
             "macros": list(self.get_macros()),
             "eps": self.extract_eps(),
+            "text": self.extract_text(),
         }
 
 class PdfDocument(object):
