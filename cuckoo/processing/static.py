@@ -8,6 +8,8 @@ import ctypes
 import datetime
 import logging
 import oletools.olevba
+from oletools.thirdparty import olefile
+from oletools.oleobj import OleNativeStream
 import os
 import peepdf.JSAnalysis
 import peepdf.PDFCore
@@ -459,10 +461,12 @@ class OfficeDocument(object):
         try:
             p = oletools.olevba.VBA_Parser(self.filepath)
         except TypeError:
+            log.error("[OfficeDocument] Error when parsing VBA code")
             return
 
         # We're not interested in plaintext.
         if p.type == "Text":
+            log.warning("[OfficeDocument] Plaintext found. Skipping...")
             return
 
         try:
@@ -510,12 +514,31 @@ class OfficeDocument(object):
                 ret.extend(re.findall(self.eps_comments, content))
         return ret
 
+    def get_objects(self):
+        ole = olefile.OleFileIO(self.filepath)
+        objects = {}
+        unnamed_streams = 0
+
+        for stream in ole.listdir():
+            if stream[-1] == "\x01Ole10Native":
+                objdata = ole.openstream(stream).read()
+                stream_path = '/'.join(stream)
+                opkg = OleNativeStream(bindata=objdata)
+                if opkg.filename:
+                    objects[opkg.filename] = opkg.data
+                else:
+                    objects["unnamed_%d" % unnamed_streams] = opkg.data
+                    unnamed_streams += 1
+
+        return objects
+
     def run(self):
         self.unpack_docx()
 
         return {
             "macros": list(self.get_macros()),
             "eps": self.extract_eps(),
+            "objects": self.get_objects(),
         }
 
 class PdfDocument(object):
