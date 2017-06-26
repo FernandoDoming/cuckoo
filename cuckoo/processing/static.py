@@ -515,20 +515,25 @@ class OfficeDocument(object):
         return ret
 
     def get_objects(self):
-        ole = olefile.OleFileIO(self.filepath)
         objects = {}
         unnamed_streams = 0
 
-        for stream in ole.listdir():
-            if stream[-1] == "\x01Ole10Native":
-                objdata = ole.openstream(stream).read()
-                stream_path = '/'.join(stream)
-                opkg = OleNativeStream(bindata=objdata)
-                if opkg.filename:
-                    objects[opkg.filename] = opkg.data
-                else:
-                    objects["unnamed_%d" % unnamed_streams] = opkg.data
-                    unnamed_streams += 1
+        try:
+            ole = olefile.OleFileIO(self.filepath)
+
+            for stream in ole.listdir():
+                if stream[-1] == "\x01Ole10Native":
+                    objdata = ole.openstream(stream).read()
+                    stream_path = '/'.join(stream)
+                    opkg = OleNativeStream(bindata=objdata)
+                    if opkg.filename:
+                        objects[opkg.filename] = opkg.data
+                    else:
+                        objects["unnamed_%d" % unnamed_streams] = opkg.data
+                        unnamed_streams += 1
+
+        except IOError as e:
+            log.error("Unable to extract OLE objects from %s" % self.filepath)
 
         return objects
 
