@@ -38,6 +38,7 @@ from cuckoo.common.objects import Archive, File
 from cuckoo.common.utils import convert_to_printable, to_unicode, jsbeautify
 from cuckoo.compat import magic
 from cuckoo.misc import cwd, dispatch, Structure
+from cuckoo.core.extract import ExtractManager
 
 log = logging.getLogger(__name__)
 
@@ -452,9 +453,10 @@ class OfficeDocument(object):
 
     eps_comments = "\\(([\\w\\s]+)\\)"
 
-    def __init__(self, filepath):
+    def __init__(self, filepath, task_id=None):
         self.filepath = filepath
         self.files = {}
+        self.task_id = task_id
 
     def get_macros(self):
         """Get embedded Macros if this is an Office document."""
@@ -526,11 +528,22 @@ class OfficeDocument(object):
                     objdata = ole.openstream(stream).read()
                     stream_path = '/'.join(stream)
                     opkg = OleNativeStream(bindata=objdata)
+                    fname = ""
                     if opkg.filename:
-                        objects[opkg.filename] = opkg.data
+                        fname = opkg.filename
                     else:
-                        objects["unnamed_%d" % unnamed_streams] = opkg.data
+                        fname = "unnamed_%d" % unnamed_streams
                         unnamed_streams += 1
+                    objects[fname] = opkg.data
+
+                    # Mark them as extracted as well
+                    em = ExtractManager(self.task_id)
+                    ext = ""
+                    if fname.rfind('.') != -1:
+                        ext = fname[fname.rfind(".")+1:]
+                    else:
+                        ext = "extracted"
+                    em.write_extracted(ext, opkg.data)
 
         except IOError as e:
             log.error("Unable to extract OLE objects from %s" % self.filepath)
@@ -816,7 +829,7 @@ class Static(Processing):
             static["wsf"] = WindowsScriptFile(f.file_path).run()
 
         if package in ("doc", "ppt", "xls") or ext in self.office_ext:
-            static["office"] = OfficeDocument(f.file_path).run()
+            static["office"] = OfficeDocument(f.file_path, self.task["id"]).run()
 
         if package == "pdf" or ext == "pdf":
             static["pdf"] = dispatch(
