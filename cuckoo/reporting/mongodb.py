@@ -244,6 +244,10 @@ class MongoDB(Report):
             report["behavior"] = dict(report["behavior"])
             report["behavior"]["processes"] = new_processes
 
+            for key, value in report["behavior"]["summary"].iteritems():
+                if value == set([]):
+                    report["behavior"]["summary"][key] = []
+
         if report.get("procmon"):
             procmon, chunk = [], []
 
@@ -258,6 +262,6 @@ class MongoDB(Report):
                 procmon.append(self.db.procmon.insert(chunk))
 
             report["procmon"] = procmon
-
+            
         # Store the report and retrieve its object id.
         self.db.analysis.save(report)

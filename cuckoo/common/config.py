@@ -774,6 +774,9 @@ class Config(object):
                 "hash_filename": Boolean(False),
                 "hash_url": Boolean(False),
             },
+            "malheur": {
+                "enabled": Boolean(False),
+            },
         },
         "routing": {
             "routing": {
