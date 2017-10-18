@@ -488,9 +488,11 @@ def migrate_cwd():
     if not os.path.exists(cwd("stuff")):
         mkdir(cwd("stuff"))
 
-    # Create the new $CWD/yara/dumpmem/ directory.
-    if not os.path.exists(cwd("yara", "dumpmem")):
-        mkdir(cwd("yara", "dumpmem"))
+    # Create the new $CWD/whitelist/ directory.
+    if not os.path.exists(cwd("whitelist")):
+        shutil.copytree(
+            cwd("..", "data", "whitelist", private=True), cwd("whitelist")
+        )
 
     hashes = {}
     for line in open(cwd("cwd", "hashes.txt", private=True), "rb"):
@@ -499,15 +501,18 @@ def migrate_cwd():
         hash_, filename = line.split()
         hashes[filename] = hashes.get(filename, []) + [hash_]
 
-    modified, outdated = [], []
+    modified, outdated, deleted = [], [], []
     for filename, hashes in hashes.items():
         if not os.path.exists(cwd(filename)):
-            outdated.append(filename)
+            if hashes[-1] != "0"*40:
+                outdated.append(filename)
             continue
         hash_ = hashlib.sha1(open(cwd(filename), "rb").read()).hexdigest()
         if hash_ not in hashes:
             modified.append(filename)
-        if hash_ != hashes[-1]:
+        elif hashes[-1] == "0"*40:
+            deleted.append(filename)
+        elif hash_ != hashes[-1]:
             outdated.append(filename)
 
     if modified:
@@ -537,11 +542,23 @@ def migrate_cwd():
 
         sys.exit(1)
 
-    for filename in outdated:
+    for filename in sorted(deleted):
+        log.debug("Deleted %s", filename)
+        os.unlink(cwd(filename))
+
+    for filename in sorted(outdated):
+        filepath = cwd("..", "data", filename, private=True)
+        if not os.path.exists(filepath):
+            log.debug(
+                "Failed to upgrade file not shipped with this release: %s",
+                filename
+            )
+            continue
+
         log.debug("Upgraded %s", filename)
         if not os.path.exists(os.path.dirname(cwd(filename))):
             os.makedirs(os.path.dirname(cwd(filename)))
-        shutil.copy(cwd("..", "data", filename, private=True), cwd(filename))
+        shutil.copy(filepath, cwd(filename))
 
     log.info(
         "Automated migration of your CWD was successful! Continuing "

@@ -37,6 +37,7 @@ from cuckoo.common.utils import convert_to_printable, to_unicode, jsbeautify
 from cuckoo.compat import magic
 from cuckoo.misc import cwd, dispatch, Structure
 
+from elftools.common.exceptions import ELFError
 from elftools.elf.constants import E_FLAGS
 from elftools.elf.descriptions import (
     describe_ei_class, describe_ei_data, describe_ei_version,
@@ -772,17 +773,9 @@ class LnkShortcut(object):
 
         header = LnkHeader.from_buffer_copy(buf[:ctypes.sizeof(LnkHeader)])
         if header.signature[:] != self.signature:
-            log.warning(
-                "Provided .lnk file is not a Microsoft Shortcut "
-                "(invalid signature)!"
-            )
             return
 
         if header.guid[:] != self.guid:
-            log.warning(
-                "Provided .lnk file is not a Microsoft Shortcut "
-                "(invalid guid)!"
-            )
             return
 
         ret = {
@@ -844,8 +837,9 @@ class ELF(object):
             self.result["relocations"] = self._get_relocations()
             self.result["notes"] = self._get_notes()
             # TODO: add library name per import (see #807)
-        except Exception as e:
-            log.exception(e)
+        except ELFError as e:
+            if e.message != "Magic number does not match":
+                raise
 
         return self.result
 
@@ -1068,8 +1062,8 @@ class Static(Processing):
 
         package = self.task.get("package")
 
-        if package == "generic" or ext == "elf" or "ELF" in f.get_type():
-            static.update(ELF(f.file_path).run())
+        if package == "generic" and (ext == "elf" or "ELF" in f.get_type()):
+            static["elf"] = ELF(f.file_path).run()
             static["keys"] = f.get_keys()
 
         if package == "exe" or ext == "exe" or "PE32" in f.get_type():
@@ -1088,7 +1082,7 @@ class Static(Processing):
                 timeout=self.options.pdf_timeout
             )
 
-        if package == "lnk" or ext == "lnk":
+        if package == "generic" or ext == "lnk":
             static["lnk"] = LnkShortcut(f.file_path).run()
 
         return static

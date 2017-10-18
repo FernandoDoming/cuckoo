@@ -9,7 +9,6 @@ import os
 import shutil
 import subprocess
 import sys
-import traceback
 
 import cuckoo
 
@@ -98,7 +97,10 @@ def cuckoo_init(level, ctx, cfg=None):
     if not os.path.exists(cwd(".cwd")):
         sys.exit(
             "No proper Cuckoo Working Directory was identified, did you pass "
-            "along the correct directory?"
+            "along the correct directory? For new installations please use a "
+            "non-existant directory to build up the CWD! You can craft a CWD "
+            "manually, but keep in mind that the CWD layout may change along "
+            "with Cuckoo releases (and don't forget to fill out '$CWD/.cwd')!"
         )
 
     init_console_logging(level)
@@ -214,19 +216,16 @@ def main(ctx, debug, quiet, nolog, maxcount, user, cwd):
         cuckoo_init(level, ctx)
         cuckoo_main(maxcount)
     except CuckooCriticalError as e:
-        message = red("{0}: {1}".format(e.__class__.__name__, e))
-        if len(log.handlers):
-            log.critical(message)
-        else:
-            sys.stderr.write("{0}\n".format(message))
+        log.critical(red("{0}: {1}".format(e.__class__.__name__, e)))
         sys.exit(1)
     except SystemExit as e:
         if e.code:
             print e
-    except:
+    except Exception as e:
         # Deal with an unhandled exception.
-        message = exception_message()
-        print message, traceback.format_exc()
+        sys.stderr.write(exception_message())
+        log.exception(red("{0}: {1}".format(e.__class__.__name__, e)))
+        sys.exit(1)
 
 @main.command()
 @click.pass_context
@@ -364,13 +363,12 @@ def process(ctx, instance, report, maxcount):
 @main.command()
 @click.argument("socket", type=click.Path(readable=False, dir_okay=False), default="/tmp/cuckoo-rooter", required=False)
 @click.option("-g", "--group", default="cuckoo", help="Unix socket group")
-@click.option("--ifconfig", type=click.Path(exists=True), default="/sbin/ifconfig", help="Path to ifconfig(8)")
 @click.option("--service", type=click.Path(exists=True), default="/usr/sbin/service", help="Path to service(8) for invoking OpenVPN")
 @click.option("--iptables", type=click.Path(exists=True), default="/sbin/iptables", help="Path to iptables(8)")
 @click.option("--ip", type=click.Path(exists=True), default="/sbin/ip", help="Path to ip(8)")
 @click.option("--sudo", is_flag=True, help="Request superuser privileges")
 @click.pass_context
-def rooter(ctx, socket, group, ifconfig, service, iptables, ip, sudo):
+def rooter(ctx, socket, group, service, iptables, ip, sudo):
     """Instantiates the Cuckoo Rooter."""
     init_console_logging(level=ctx.parent.level)
 
@@ -378,7 +376,6 @@ def rooter(ctx, socket, group, ifconfig, service, iptables, ip, sudo):
         args = [
             "sudo", sys.argv[0], "rooter", socket,
             "--group", group,
-            "--ifconfig", ifconfig,
             "--service", service,
             "--iptables", iptables,
             "--ip", ip,
@@ -393,7 +390,7 @@ def rooter(ctx, socket, group, ifconfig, service, iptables, ip, sudo):
             pass
     else:
         try:
-            cuckoo_rooter(socket, group, ifconfig, service, iptables, ip)
+            cuckoo_rooter(socket, group, service, iptables, ip)
         except KeyboardInterrupt:
             print(red("Aborting the Cuckoo Rooter.."))
 

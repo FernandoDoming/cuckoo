@@ -9,7 +9,7 @@ import tempfile
 
 from cuckoo.common.config import (
     Config, parse_options, emit_options, config, cast, Path, read_kv_conf,
-    config2, List, String
+    config2, List, String, _cache
 )
 from cuckoo.common.constants import faq
 from cuckoo.common.exceptions import (
@@ -1116,6 +1116,17 @@ arch = x64
     assert cfg["qemu"]["ubuntu32"]["enable_kvm"] is False
     assert cfg["qemu"]["ubuntu32"]["snapshot"] is None
 
+def test_migration_204_205():
+    set_cwd(tempfile.mkdtemp())
+    Folders.create(cwd(), "conf")
+    Files.create(cwd("conf"), "auxiliary.conf", """
+[mitm]
+script = mitm.py
+""")
+    cfg = Config.from_confdir(cwd("conf"), loose=True)
+    cfg = migrate(cfg, "2.0.4", "2.0.5")
+    assert cfg["auxiliary"]["mitm"]["script"] == "stuff/mitm.py"
+
 class FullMigration(object):
     DIRPATH = None
     VERSION = None
@@ -1403,3 +1414,21 @@ def test_no_superfluous_conf(p):
 def test_faq():
     assert faq("hehe").startswith("http")
     assert faq("hehe").endswith("#hehe")
+
+def test_incomplete_envvar():
+    set_cwd(tempfile.mkdtemp())
+    cuckoo_create(cfg={
+        "cuckoo": {
+            "database": {
+                "connection": "%(",
+            },
+        },
+    })
+
+    # Clear cache.
+    for key in _cache.keys():
+        del _cache[key]
+
+    with pytest.raises(CuckooConfigurationError) as e:
+        config("cuckoo:database:connection")
+    e.match("One of the fields")

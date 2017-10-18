@@ -2,6 +2,7 @@
 # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
 # See the file 'docs/LICENSE' for copying permission.
 
+import datetime
 import dpkt
 import hashlib
 import mock
@@ -19,7 +20,7 @@ from cuckoo.common.files import Files
 from cuckoo.common.objects import Dictionary
 from cuckoo.core.database import Database
 from cuckoo.core.plugins import RunProcessing
-from cuckoo.core.startup import init_console_logging
+from cuckoo.core.startup import init_console_logging, init_yara
 from cuckoo.main import cuckoo_create
 from cuckoo.misc import set_cwd, cwd, mkdir
 from cuckoo.processing.behavior import (
@@ -253,7 +254,7 @@ class TestProcessing(object):
         s = Static()
         s.set_task({
             "category": "file",
-            "package": "lnk",
+            "package": "generic",
             "target": "lnk_1.lnk",
         })
         s.file_path = "tests/files/lnk_1.lnk"
@@ -269,6 +270,16 @@ class TestProcessing(object):
         assert "powershell.exe" in obj["relapath"]
         assert "-NoProfile" in obj["cmdline"]
         assert "eABlACIA" in obj["cmdline"]
+
+    def test_lnk2(self):
+        s = Static()
+        s.set_task({
+            "category": "file",
+            "package": "generic",
+            "target": "lnk_2.lnk",
+        })
+        s.file_path = "tests/files/lnk_2.lnk"
+        assert "elf" not in s.run()
 
     def test_procmon(self):
         p = Procmon()
@@ -406,6 +417,10 @@ class TestProcessing(object):
         assert s.run() == []
 
     def test_targetinfo(self):
+        set_cwd(tempfile.mkdtemp())
+        cuckoo_create()
+        init_yara()
+
         ti = TargetInfo()
         ti.file_path = __file__
         ti.set_task({
@@ -790,6 +805,7 @@ class TestBehavior(object):
     def test_extract_scripts(self):
         set_cwd(tempfile.mkdtemp())
         cuckoo_create()
+        init_yara()
 
         mkdir(cwd(analysis=1))
 
@@ -837,6 +853,104 @@ class TestBehavior(object):
         }]
         assert open(out[0]["script"], "rb").read() == "ping 1.2.3.4"
         assert open(out[1]["script"], "rb").read() == 'echo "Recursive"'
+
+    def test_stap_log(self):
+        set_cwd(tempfile.mkdtemp())
+        cuckoo_create()
+        init_yara()
+
+        mkdir(cwd(analysis=1))
+        mkdir(cwd("logs", analysis=1))
+        shutil.copy(
+            "tests/files/log_full.stap", cwd("logs", "all.stap", analysis=1)
+        )
+
+        ba = BehaviorAnalysis()
+        ba.set_path(cwd(analysis=1))
+        ba.set_task({
+            "id": 1,
+        })
+
+        assert ba.run() == {
+            "generic": [{
+                "first_seen": datetime.datetime(2017, 8, 28, 14, 29, 32, 618541),
+                "pid": 820,
+                "ppid": 819,
+                "process_name": "sh",
+                "process_path": None,
+                "summary": {},
+            }, {
+                "first_seen": datetime.datetime(2017, 8, 28, 14, 29, 32, 619135),
+                "pid": 821,
+                "ppid": 820,
+                "process_name": "bash",
+                "process_path": None,
+                "summary": {},
+            }, {
+                "first_seen": datetime.datetime(2017, 8, 28, 14, 29, 32, 646318),
+                "pid": 822,
+                "ppid": 821,
+                "process_name": "ls",
+                "process_path": None,
+                "summary": {},
+            }],
+            "processes": [{
+                "calls": [],
+                "command_line": "/bin/sh /tmp/execve.sh",
+                "first_seen": datetime.datetime(2017, 8, 28, 14, 29, 32, 618541),
+                "pid": 820,
+                "ppid": 819,
+                "process_name": "sh",
+                "type": "process"
+            }, {
+                "calls": [],
+                "command_line": (
+                    "/bin/bash -c python -c 'import subprocess; "
+                    "subprocess.call([\"/bin/ls\", \"/hax\"])'"
+                ),
+                "first_seen": datetime.datetime(2017, 8, 28, 14, 29, 32, 619135),
+                "pid": 821,
+                "ppid": 820,
+                "process_name": "bash",
+                "type": "process"
+            }, {
+                "calls": [],
+                "command_line": "/bin/ls /hax",
+                "first_seen": datetime.datetime(2017, 8, 28, 14, 29, 32, 646318),
+                "pid": 822,
+                "ppid": 821,
+                "process_name": "ls",
+                "type": "process"
+            }],
+            "processtree": [{
+                "children": [{
+                    "children": [{
+                        "children": [],
+                        "command_line": "/bin/ls /hax",
+                        "first_seen": datetime.datetime(2017, 8, 28, 14, 29, 32, 646318),
+                        "pid": 822,
+                        "ppid": 821,
+                        "process_name": "ls",
+                        "track": True
+                    }],
+                    "command_line": (
+                        "/bin/bash -c python -c 'import subprocess; "
+                        "subprocess.call([\"/bin/ls\", \"/hax\"])'"
+                    ),
+                    "first_seen": datetime.datetime(2017, 8, 28, 14, 29, 32, 619135),
+                    "pid": 821,
+                    "ppid": 820,
+                    "process_name": "bash",
+                    "track": True
+                }],
+                "command_line": "/bin/sh /tmp/execve.sh",
+                "first_seen": datetime.datetime(2017, 8, 28, 14, 29, 32, 618541),
+                "pid": 820,
+                "ppid": 819,
+                "process_name": "sh",
+                "track": True
+            }],
+        }
 
 class TestPcap(object):
     @classmethod

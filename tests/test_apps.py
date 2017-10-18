@@ -56,6 +56,16 @@ class TestAppsWithCWD(object):
         main.main(("--cwd", cwd(), "-d", "--nolog"), standalone_mode=False)
         q.assert_called_once()
 
+    @mock.patch("cuckoo.main.load_signatures")
+    @mock.patch("cuckoo.main.log")
+    def test_main_exception(self, p, q):
+        q.side_effect = Exception("this is a test")
+        with pytest.raises(SystemExit):
+            main.main(
+                ("--cwd", cwd(), "-d", "--nolog"), standalone_mode=False
+            )
+        p.exception.assert_called_once()
+
     def test_api(self):
         with mock.patch("cuckoo.main.cuckoo_api") as p:
             p.return_value = None
@@ -672,12 +682,31 @@ class TestMigrateCWD(object):
             cwd("web/local_settings.py")
         )
 
+    @mock.patch("cuckoo.apps.apps.hashlib")
+    def test_deleted_file(self, p):
+        set_cwd(tempfile.mkdtemp())
+        cuckoo_create()
+
+        def our_sha1(buf):
+            class obj(object):
+                def hexdigest(self):
+                    return "4989ba7ce0dc38709dd125d6c4fac5852914f0c7"
+            return obj() if buf == "yes!" else hashlib.sha1(buf)
+
+        p.sha1.side_effect = our_sha1
+
+        open(cwd("analyzer/windows/lib/common/errors.py"), "wb").write("yes!")
+        assert os.path.exists(cwd("analyzer/windows/lib/common/errors.py"))
+        migrate_cwd()
+        assert not os.path.exists(cwd("analyzer/windows/lib/common/errors.py"))
+
     def test_new_directory(self):
         set_cwd(tempfile.mkdtemp())
         cuckoo_create()
         shutil.rmtree(cwd("yara", "scripts"))
         shutil.rmtree(cwd("yara", "shellcode"))
         shutil.rmtree(cwd("stuff"))
+        shutil.rmtree(cwd("whitelist"))
         open(cwd("yara", "index_binaries.yar"), "wb").write("hello")
         migrate_cwd()
         # TODO Move this to its own 2.0.2 -> 2.0.3 migration handler.
@@ -685,7 +714,10 @@ class TestMigrateCWD(object):
         assert os.path.exists(cwd("yara", "shellcode", ".gitignore"))
         # TODO Move this to its own 2.0.3 -> 2.0.4 migration handler.
         assert os.path.exists(cwd("stuff"))
-        assert os.path.exists(cwd("yara", "dumpmem"))
+        assert os.path.exists(cwd("whitelist"))
+        assert open(cwd("whitelist", "domain.txt"), "rb").read().strip() == (
+            "# You can add whitelisted domains here."
+        )
         assert not os.path.exists(cwd("yara", "index_binaries.yar"))
 
     def test_using_community(self):

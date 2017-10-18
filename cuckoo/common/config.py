@@ -296,7 +296,7 @@ class Config(object):
                 ),
                 "port_base": Int(50000),
                 "script": Path(
-                    "mitm.py",
+                    "stuff/mitm.py",
                     exists=False, writable=False, readable=True
                 ),
                 "certificate": Path(
@@ -948,6 +948,18 @@ class Config(object):
                 raise CuckooConfigurationError(
                     "Missing environment variable: %s" % e
                 )
+            except ValueError as e:
+                if e.message == "incomplete format key":
+                    raise CuckooConfigurationError(
+                        "One of the fields that you've filled out in "
+                        "$CWD/conf/%s contains the sequence '%(' which is "
+                        "interpreted as environment variable sequence, e.g., "
+                        "'%(PGPASSWORD)s' would locate a PostgreSQL "
+                        "password. Please update the field to correctly "
+                        "state the environment variable or change it in a "
+                        "way that '%(' is no longer in the variable."
+                    )
+                raise
 
             for name, raw_value in items:
                 if name in self.env_keys:

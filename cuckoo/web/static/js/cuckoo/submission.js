@@ -122,6 +122,8 @@ var AnalysisInterface = function () {
 					delete item.children;
 				}
 
+				item.filename = CuckooWeb.unescapeHTML(item.filename);
+
 				return item;
 			});
 
@@ -606,7 +608,7 @@ function getItemName(item) {
 	if (this.options.config.nameKey) {
 		name = item[this.options.config.nameKey];
 	}
-	return name;
+	return CuckooWeb.escapeHTML(name);
 }
 
 function createSelectable(item, name, text) {
@@ -776,7 +778,7 @@ function bubbleSelection(arr, checked) {
 	});
 }
 
-// bubbles up a selection, works kind of the same as 
+// bubbles up a selection, works kind of the same as
 // bubbleSelection, but then the other direction around.
 function bubbleItemParentsUp(item, cb) {
 
@@ -1289,11 +1291,11 @@ var FileTree = function () {
 
 				item.options = diff(item.changed_properties, item.per_file_options);
 
-				// deletes all filetree specific properties from this item 
+				// deletes all filetree specific properties from this item
 				// (the properties that are sent out as JSON)
 				if (item.filetree) delete item.filetree;
 
-				// if(item.changed_properties) 
+				// if(item.changed_properties)
 				// 	delete item.changed_properties;
 
 				if (item.parent) delete item.parent;
@@ -2403,8 +2405,7 @@ var submission_options = [{
 	name: 'simulated-human-interaction',
 	label: 'Enable Simulated Human Interaction',
 	selected: true
-}
-];
+}];
 
 // package field contents - hardcoded options vs auto-detected properties
 // gets updated when packages come back that aren;t in this array in the response
@@ -2495,6 +2496,7 @@ $(function () {
 
 							// machine guess: package options
 							// - also preselects the package field if available
+
 							if (item.package) {
 								item.per_file_options['package'] = item.package;
 								if (default_package_selection_options.indexOf(item.package) == -1) {
@@ -2539,6 +2541,9 @@ $(function () {
 							e.stopImmediatePropagation();
 							controller.detailView(self);
 						});
+
+						// make sure the filename is escaped to prevent XSS attacks
+						this.filename = CuckooWeb.escapeHTML(this.filename);
 
 						return el;
 					},
@@ -2639,6 +2644,7 @@ $(function () {
 											default: item.per_file_options['package'],
 											options: default_package_selection_options
 										}).on('change', function (value) {
+
 											item.per_file_options['package'] = value;
 											if (value == 'default') value = null;
 											setFieldValue.call(this, value);
@@ -2651,7 +2657,6 @@ $(function () {
 											options: [{ name: 'low', value: 1, className: 'priority-s' }, { name: 'medium', value: 2, className: 'priority-m' }, { name: 'high', value: 3, className: 'priority-l' }]
 										}).on('change', function (value) {
 											item.per_file_options['priority'] = value;
-											console.log(setFieldValue);
 											setFieldValue.call(this, parseInt(value));
 										});
 
@@ -2756,6 +2761,14 @@ $(function () {
 						doc_link: 'https://cuckoo.sh/docs/usage/packages.html',
 						default: default_analysis_options['package'],
 						options: default_package_selection_options
+					}).on('change', function (value) {
+
+						// sets all items to the correct value of package, this does
+						// not seem to work correctly, so this basically forces the
+						// correct value.
+						analysis_ui.filetree.each(function (item) {
+							item.per_file_options.package = value;
+						});
 					});
 
 					var priority = new this.TopSelect({
@@ -2793,15 +2806,16 @@ $(function () {
 					form.draw();
 
 					// this gets fired EVERY time one of the fields
-					// insdie the form gets updated. it sends 
-					// back an object with all the current values of 
+					// insdie the form gets updated. it sends
+					// back an object with all the current values of
 					// the form instance.
 					form.on('change', function (values) {
 
 						function compareAndOverwrite(item) {
 
+							// makes only exception rule for 'package'
 							for (var val in values) {
-								if (item.changed_properties && item.changed_properties.indexOf(val) == -1) {
+								if (item.changed_properties && item.changed_properties.indexOf(val) == -1 && val !== 'package') {
 									item.per_file_options[val] = values[val];
 								}
 							}
@@ -2864,12 +2878,17 @@ $(function () {
 
 			e.preventDefault();
 
-			// $(".page-freeze").addClass('in');
-			CuckooWeb.toggle_page_freeze(true, "We're processing your submission... This could take a few seconds.");
-
 			var json = analysis_ui.getData({
 				'submit_id': window.submit_id
 			}, true);
+
+			if (!JSON.parse(json).file_selection.length) {
+				alert('Please select some files first.');
+				return;
+			}
+
+			// $(".page-freeze").addClass('in');
+			CuckooWeb.toggle_page_freeze(true, "We're processing your submission... This could take a few seconds.");
 
 			if (debugging) {
 				console.log(JSON.parse(json));

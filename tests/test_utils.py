@@ -16,6 +16,7 @@ import cuckoo
 
 from cuckoo.common.exceptions import CuckooOperationalError
 from cuckoo.common.files import Folders, Files, Storage, temppath
+from cuckoo.common.whitelist import is_whitelisted_domain
 from cuckoo.common import utils
 from cuckoo.main import cuckoo_create
 from cuckoo.misc import set_cwd
@@ -386,6 +387,9 @@ def test_validate_url():
     assert utils.validate_url("google.com/test") == "http://google.com/test"
     assert utils.validate_url("https://google.com/") == "https://google.com/"
     assert utils.validate_url("ftp://google.com/") is None
+    assert utils.validate_url(
+        "https://https://google.com/", allow_invalid=True
+    ) == "https://google.com/"
 
 def test_validate_hash():
     assert utils.validate_hash("a") is False
@@ -420,3 +424,8 @@ def test_list_of():
     assert utils.list_of_ints([1, "1"]) is False
     assert utils.list_of_ints([1, 2]) is True
     assert utils.list_of_ints([lambda x: x]) is False
+
+def test_is_whitelisted_domain():
+    assert is_whitelisted_domain("java.com") is True
+    assert is_whitelisted_domain("java2.com") is False
+    assert is_whitelisted_domain("crl.microsoft.com") is True

@@ -28,7 +28,7 @@ class CuckooWeb {
     }
 
     static api_post(url, params, callback, errback, beforesend){
-        
+
         let data = JSON.stringify(params);
 
         $.ajax({
@@ -101,7 +101,7 @@ class CuckooWeb {
         $('.page-freeze__options').removeClass('hidden');
     }
 
-    // shorthand for posting urls to /submit because this method 
+    // shorthand for posting urls to /submit because this method
     // is used in multiple contexts (dashboard, submit)
     static submit_url(urls) {
 
@@ -120,7 +120,7 @@ class CuckooWeb {
 
     }
 
-    // returns true if the client browser is in the 
+    // returns true if the client browser is in the
     // recommended browser list.
     static isRecommendedBrowser() {
 
@@ -154,6 +154,37 @@ class CuckooWeb {
 
     }
 
+    // escaping html
+    static escapeHTML(string) {
+
+      var entityMap = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '/': '&#x2F;',
+        '`': '&#x60;',
+        '=': '&#x3D;'
+      };
+
+      return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+        return entityMap[s];
+      });
+
+    }
+
+    // reverses the above function
+    static unescapeHTML(string) {
+      // the most amazing solution ever, found at:
+      // https://stackoverflow.com/questions/1147359/how-to-decode-html-entities-using-jquery#comment6018122_2419664
+
+      var t = document.createElement('textarea');
+      t.innerHTML = string;
+      return t.value;
+
+    }
+
 }
 
 /*
@@ -162,7 +193,7 @@ class CuckooWeb {
     - primarily [now] used at the network analysis page as proof of concept
     - this class will be traversible and highly configurable using hooks (will improve overall page performance)
     - this technique might open a few windows on asynchronous page loading, which I will highly recommend for this page
-    - also in mind to do this all using Handlebars, which works overall nice with these kind of pages, but that'll 
+    - also in mind to do this all using Handlebars, which works overall nice with these kind of pages, but that'll
       require some back-end logistics for getting its required data. but this needs to be discussed at some point.
       Overall thing is: This page is excrumentially slow, due to ALL the data that is present in the html on load of this
       page, which makes it perform really bad. See webconsole's Profile Check for a lookup.
@@ -171,7 +202,7 @@ class CuckooWeb {
     default pageswitcher html structure:
 
     <div class="page-switcher">
-    
+
         <nav class="page-switcher__nav">
             <a href="page-switcher-page-1" class="active">page 1</a>
             <a href="page-switcher-page-2">page 2</a>
@@ -299,7 +330,7 @@ class PageSwitcher {
     /*
         public method for transitioning programatically
      */
-    transition(name) { 
+    transition(name) {
 
         if(typeof name === 'number') {
             var name = this.getPage(name).name;
@@ -416,7 +447,7 @@ $(function() {
         $(this).parent().find('.app-nav__dropdown').toggleClass('in');
     });
 
-    $(".theme-selection a").bind('click', function(e) { 
+    $(".theme-selection a").bind('click', function(e) {
         e.preventDefault();
         // set active class
         $(".theme-selection a").removeClass('active');
@@ -617,13 +648,13 @@ $(function() {
                 },
                 options: {
                     cutoutPercentage: 70,
-                    legend: { 
+                    legend: {
                         // we use a custom legend featuring more awesomeness
-                        display: false 
+                        display: false
                     },
-                    tooltips: { 
+                    tooltips: {
                         // tooltips are for 1996
-                        enabled: false 
+                        enabled: false
                     }
                 }
             });
@@ -678,7 +709,7 @@ $(function() {
             }
         });
 
-        submit_uploader.draw(); 
+        submit_uploader.draw();
 
     }
 
@@ -750,7 +781,7 @@ $(function() {
             // data.data.memtotal = 11989568;
             // data.data.memavail = 2899792;
 
-            // memory chart 
+            // memory chart
             if(data.data.memtotal) {
 
                 // memory data
@@ -807,7 +838,7 @@ $(function() {
     if($("body#analysis").length) {
         $(".cuckoo-analysis").focus();
         $("#analysis-nav, #primary-nav").bind('click', function() {
-            $(".cuckoo-analysis").focus();            
+            $(".cuckoo-analysis").focus();
         });
     }
 
@@ -822,19 +853,22 @@ $(function() {
         });
 
         urls = urls.join('\n');
-        CuckooWeb.submit_url(urls); 
+        CuckooWeb.submit_url(urls);
     });
 
-    // initialise hljs
-    hljs.configure({
-        languages: ['js']
-    });
 
-    hljs.initHighlightingOnLoad();
+    if(hljs) {
+      // initialise hljs
+      hljs.configure({
+          languages: ['js']
+      });
 
-    $("pre code").each(function(i, element) {
-        hljs.highlightBlock(element);
-    });
+      hljs.initHighlightingOnLoad();
+
+      $("pre code").each(function(i, element) {
+          hljs.highlightBlock(element);
+      });
+    }
 
     // retrieving powershell code and displaying it - if it hasn't been loaded yet.
     if($(".extracted-switcher").length) {

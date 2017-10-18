@@ -22,10 +22,11 @@ import urlparse
 from cuckoo.common.abstracts import Processing
 from cuckoo.common.config import config
 from cuckoo.common.dns import resolve
+from cuckoo.common.exceptions import CuckooProcessingError
 from cuckoo.common.irc import ircMessage
 from cuckoo.common.objects import File
 from cuckoo.common.utils import convert_to_printable
-from cuckoo.common.exceptions import CuckooProcessingError
+from cuckoo.common.whitelist import is_whitelisted_domain
 from cuckoo.misc import cwd
 
 # Be less verbose about httpreplay logging messages.
@@ -82,8 +83,6 @@ class Pcap(object):
         self.irc_requests = []
         # Dictionary containing all the results of this processing.
         self.results = {}
-        # List containing all whitelist entries.
-        self.whitelist = self._build_whitelist()
         # List for holding whitelisted IP-s according to DNS responses
         self.whitelist_ips = []
         # state of whitelisting
@@ -93,20 +92,13 @@ class Pcap(object):
         # List of all used DNS servers
         self.dns_servers = []
 
-    def _build_whitelist(self):
-        result = []
-        whitelist_path = cwd("whitelist", "domain.txt", private=True)
-        for line in open(whitelist_path, "rb"):
-            result.append(line.strip())
-        return result
-
     def _is_whitelisted(self, conn, hostname):
         """Checks if whitelisting conditions are met"""
-        # is whitelistng enabled ?
+        # Is whitelistng enabled?
         if not self.whitelist_enabled:
             return False
 
-        # is DNS recording coming from allowed NS server
+        # Is DNS recording coming from allowed NS server.
         if not self.known_dns:
             pass
         elif (conn.get("src") in self.known_dns or
@@ -115,8 +107,8 @@ class Pcap(object):
         else:
             return False
 
-        # is hostname whitelisted
-        if hostname not in self.whitelist:
+        # Is hostname whitelisted.
+        if not is_whitelisted_domain(hostname):
             return False
 
         return True

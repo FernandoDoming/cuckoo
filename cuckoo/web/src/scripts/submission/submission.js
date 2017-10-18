@@ -139,6 +139,7 @@ $(function() {
 
 							// machine guess: package options
 							// - also preselects the package field if available
+
 							if(item.package) {
 								item.per_file_options['package'] = item.package
 								if(default_package_selection_options.indexOf(item.package) == -1) {
@@ -170,7 +171,7 @@ $(function() {
 
 						// this = item
 						var _$d = $(el).find('div');
-						var size = FileTree.Label('size', FileTree.humanizeBytes(this.size)); 
+						var size = FileTree.Label('size', FileTree.humanizeBytes(this.size));
 						var info = FileTree.Label('info', '<i class="fa fa-info-circle"></i>', 'a');
 
 						// adds the meta data
@@ -186,6 +187,9 @@ $(function() {
 							controller.detailView(self);
 						});
 
+						// make sure the filename is escaped to prevent XSS attacks
+						this.filename = CuckooWeb.escapeHTML(this.filename);
+
 						return el;
 					},
 
@@ -193,7 +197,7 @@ $(function() {
 
 						var self = this;
 						var _$d = $(el).find('div');
-						var size = FileTree.Label('size', FileTree.humanizeBytes(FileTree.folderSize(this))); 
+						var size = FileTree.Label('size', FileTree.humanizeBytes(FileTree.folderSize(this)));
 						var archive, info;
 
 						if(this.type === 'container') {
@@ -218,7 +222,7 @@ $(function() {
 								});
 							}
 							_$d.append(archive);
-							
+
 						}
 
 						return el;
@@ -255,7 +259,7 @@ $(function() {
 							var form = new InterfaceControllers.Form({
 								container: $per_file_options,
 								configure: function(form) {
-									
+
 									var network = new this.TopSelect({
 										name: 'network-routing-' + item.filetree.index,
 										title: 'Network Routing',
@@ -287,9 +291,11 @@ $(function() {
 										default: item.per_file_options['package'],
 										options: default_package_selection_options
 									}).on('change', function(value) {
+
 										item.per_file_options['package'] = value;
 										if(value == 'default') value = null;
 										setFieldValue.call(this, value);
+
 									});
 
 									var priority = new this.TopSelect({
@@ -303,7 +309,6 @@ $(function() {
 										]
 									}).on('change', function(value) {
 										item.per_file_options['priority'] = value;
-										console.log(setFieldValue);
 										setFieldValue.call(this, parseInt(value));
 									});
 
@@ -330,7 +335,7 @@ $(function() {
 										default: item.per_file_options['options'],
 										options: submission_options,
 										on: {
-											init: function() {	
+											init: function() {
 
 												/*
 													attach any predefined values to the stack
@@ -422,6 +427,15 @@ $(function() {
 						doc_link: 'https://cuckoo.sh/docs/usage/packages.html',
 						default: default_analysis_options['package'],
 						options: default_package_selection_options
+					}).on('change', function(value) {
+
+						// sets all items to the correct value of package, this does
+						// not seem to work correctly, so this basically forces the
+						// correct value.
+						analysis_ui.filetree.each(function(item) {
+							item.per_file_options.package = value;
+						});
+
 					});
 
 					var priority = new this.TopSelect({
@@ -468,15 +482,16 @@ $(function() {
 					form.draw();
 
 					// this gets fired EVERY time one of the fields
-					// insdie the form gets updated. it sends 
-					// back an object with all the current values of 
+					// insdie the form gets updated. it sends
+					// back an object with all the current values of
 					// the form instance.
 					form.on('change', function(values) {
-						
+
 						function compareAndOverwrite(item) {
 
+							// makes only exception rule for 'package'
 							for(var val in values) {
-								if(item.changed_properties && item.changed_properties.indexOf(val) == -1) {
+								if(item.changed_properties && item.changed_properties.indexOf(val) == -1 && val !== 'package') {
 									item.per_file_options[val] = values[val];
 								}
 							}
@@ -542,18 +557,23 @@ $(function() {
 
 			e.preventDefault();
 
-			// $(".page-freeze").addClass('in');
-			CuckooWeb.toggle_page_freeze(true,"We're processing your submission... This could take a few seconds.");
-
 			var json = analysis_ui.getData({
 				'submit_id': window.submit_id
 			}, true);
+
+			if(!JSON.parse(json).file_selection.length) {
+				alert('Please select some files first.');
+				return;
+			}
+
+			// $(".page-freeze").addClass('in');
+			CuckooWeb.toggle_page_freeze(true,"We're processing your submission... This could take a few seconds.");
 
 			if(debugging) {
 				console.log(JSON.parse(json));
 				return;
 			}
-				
+
 			$.ajax({
 				url: '/submit/api/submit',
 				type: 'POST',
@@ -623,7 +643,7 @@ $(function() {
 				});
 			}
 		});
-		
+
 	}
 
 });
