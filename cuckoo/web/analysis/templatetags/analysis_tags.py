@@ -23,6 +23,11 @@ def is_dict(value):
     return isinstance(value, dict)
 
 @register.filter
+def is_list(value):
+    """Checks if value is an instance of list"""
+    return isinstance(value, list)
+
+@register.filter
 def get_item(dictionary, key):
     return dictionary.get(key, "")
 

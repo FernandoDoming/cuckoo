@@ -699,6 +699,8 @@ class Signature(object):
     # than calling the generic on_call(), call, e.g., on_call_CreateFile().
     on_call_dispatch = False
 
+    procmem = None
+
     def __init__(self, caller):
         """
         @param caller: calling object. Stores results in caller.results
@@ -988,6 +990,65 @@ class Signature(object):
         """Returns the information retrieved from virustotal."""
         return self.get_results("virustotal", {})
 
+    def va_from_offset(self, offset):
+        if not self.procmem:
+            return None
+
+        reg = None
+        for region in self.procmem["regions"]:
+            if offset >= region["offset"] and offset <= region["offset"] + region["size"]:
+                reg = region
+                break
+
+        base_va = int(reg["addr"], 16)
+        relative_offset = offset - reg["offset"] 
+        return base_va + relative_offset
+
+    def get_region(self, addr):
+        if not self.procmem:
+            return None
+
+        for region in self.procmem["regions"]:
+            if addr >= int(region["addr"], 16) and addr <= int(region["end"], 16):
+                return region
+        return None
+
+    def deref(self, addr, size):
+        data = None
+        if not self.procmem:
+            return data
+
+        region = self.get_region(addr)
+        if not region:
+            return data
+
+        rva = addr - int(region["addr"], 16)
+
+        f = open(self.procmem["file"])
+        f.seek(region["offset"] + rva)
+        data = f.read(size)
+        f.close()
+
+        return data
+
+    def deref_string(self, addr):
+        data = ""
+        p = addr
+        while True:
+            byte = self.deref(p, 1)
+            if byte == '\x00' or byte is None:
+                return data
+            p    += 1
+            data += byte
+        return data
+
+    def read_offset(self, offset, len):
+        f = open(self.procmem["file"])
+        f.seek(offset)
+        data = f.read(len)
+        f.close()
+        return data
+
     def get_volatility(self, module=None):
         """Returns the data that belongs to the given module."""
         volatility = self.get_results("memory", {})
@@ -1123,13 +1184,7 @@ class Signature(object):
 
         self.marks.append({
             "type": "config",
-            "config": {
-                "family": config["family"],
-                "url": url,
-                "cnc": cnc,
-                "key": config.get("key"),
-                "type": config.get("type"),
-            },
+            "config": config,
         })
 
     def mark(self, **kwargs):
@@ -1297,6 +1352,7 @@ class ProtocolHandler(object):
 
     def close(self):
         pass
+
 
 class Extractor(object):
     """One piece in a series of recursive extractors & unpackers."""

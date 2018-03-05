@@ -86,38 +86,20 @@
                                 <h3 class="panel-title">{{ cfgextr.family }}</h3>
                             </div>
                             <ul class="list-group">
-                                {% if cfgextr.cnc %}
+                                {% for key, val in cfgextr.items %}
                                 <li class="list-group-item">
-                                    <span class="item-label">CnC</span>
+                                    <span class="item-label">{{ key }}</span>
                                     <ul>
-                                        {% for url in cfgextr.cnc %}
-                                        <li>{{ url }}</li>
-                                        {% endfor %}
+                                        {% if val|is_list %}
+                                            {% for item in val %}
+                                            <li>{{ item }}</li>
+                                            {% endfor %}
+                                        {% else %}
+                                            <li>{{ val }}</li>
+                                        {% endif %}
                                     </ul>
-                                </li>
-                                {% endif %}
-                                {% if cfgextr.url %}
-                                <li class="list-group-item">
-                                    <span class="item-label">URLs</span>
-                                    <ul>
-                                        {% for url in cfgextr.url %}
-                                        <li>{{ url }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </li>
-                                {% endif %}
-                                {% if cfgextr.key %}
-                                <li class="list-group-item">
-                                    <span class="item-label">Encryption key</span>
-                                    <p>{{ cfgextr.key }}</p>
-                                </li>
-                                {% endif %}
-                                {% if cfgextr.type %}
-                                <li class="list-group-item">
-                                    <span class="item-label">Package / Type</span>
-                                    <p>{{ cfgextr.type }}</p>
-                                </li>
-                                {% endif %}
+                                </li>                                
+                                {% endfor %}
                             </ul>
                         </div>
 

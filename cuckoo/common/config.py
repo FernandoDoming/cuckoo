@@ -714,6 +714,13 @@ class Config(object):
                 "indent": Int(4),
                 "calls": Boolean(True),
             },
+            "maltrack": {
+                "enabled": Boolean(False),
+                "host": String("127.0.0.1"),
+                "port": Int(3030),
+                "auth_token": String("Token here"),
+                "scheme": String("http"),
+            },
             "singlefile": {
                 "enabled": Boolean(False),
                 "html": Boolean(False),
