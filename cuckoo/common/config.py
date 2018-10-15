@@ -655,6 +655,9 @@ class Config(object):
                 "url": String(),
                 "probes": String(required=False),
             },
+            "ja3": {
+                "enabled": Boolean(False),
+            },
         },
         "qemu": {
             "qemu": {
